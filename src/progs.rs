@@ -62,12 +62,17 @@ impl ProgsBar {
         let perc = (current * 100 / total.max(1)).min(100);
         let (eta_h, eta_m, eta_s) = (eta_secs / 3600, (eta_secs % 3600) / 60, eta_secs % 60);
 
-        eprint!(
-            "\r\x1b[2K{W}IDX: {C}[{bar}{C}] {W}{perc}%{C}, {Y}{mbps} MBs{C}, \
-             {W}{eta_h:02}{P}:{W}{eta_m:02}{P}:{W}{eta_s:02}{C}, \
-             {G}{mb_current}{C}/{R}{mb_total}{N}"
+        let _ = crossterm::queue!(
+            std::io::stderr(),
+            crossterm::cursor::MoveToColumn(0),
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+            crossterm::style::Print(format!(
+                "{W}IDX: {C}[{bar}{C}] {W}{perc}%{C}, {Y}{mbps} MBs{C}, eta \
+                 {W}{eta_h:02}{P}:{W}{eta_m:02}{P}:{W}{eta_s:02}{C}, \
+                 {G}{mb_current}{C}/{R}{mb_total}{N}"
+            ))
         );
-        std::io::stderr().flush().unwrap();
+        let _ = std::io::stderr().flush();
     }
 
     pub fn up_scenes(&mut self, current: usize, total: usize) {
@@ -86,21 +91,32 @@ impl ProgsBar {
         let perc = (current * 100 / total.max(1)).min(100);
         let (eta_m, eta_s) = ((eta_secs % 3600) / 60, eta_secs % 60);
 
-        eprint!(
-            "\r\x1b[2K{W}SCD: {C}[{bar}{C}] {W}{perc}%{C}, {Y}{fps} FPS{C}, \
-             {W}{eta_m:02}{P}:{W}{eta_s:02}{C}, {G}{current}{C}/{R}{total}{N}"
+        let _ = crossterm::queue!(
+            std::io::stderr(),
+            crossterm::cursor::MoveToColumn(0),
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+            crossterm::style::Print(format!(
+                "{W}SCD: {C}[{bar}{C}] {W}{perc}%{C}, {Y}{fps} FPS{C}, eta \
+                 {W}{eta_m:02}{P}:{W}{eta_s:02}{C}, {G}{current}{C}/{R}{total}{N}"
+            ))
         );
-        std::io::stderr().flush().unwrap();
+        let _ = std::io::stderr().flush();
     }
 
     pub fn finish() {
-        eprint!("\r\x1b[2K");
-        std::io::stderr().flush().unwrap();
+        let _ = crossterm::execute!(
+            std::io::stderr(),
+            crossterm::cursor::MoveToColumn(0),
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine)
+        );
     }
 
     pub fn finish_scenes() {
-        eprint!("\r\x1b[2K");
-        std::io::stderr().flush().unwrap();
+        let _ = crossterm::execute!(
+            std::io::stderr(),
+            crossterm::cursor::MoveToColumn(0),
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine)
+        );
     }
 }
 
@@ -124,8 +140,7 @@ impl ProgsTrack {
     ) -> Self {
         let (tx, rx) = crossbeam_channel::unbounded();
 
-        eprint!("\x1b[s");
-        std::io::stderr().flush().unwrap();
+        let _ = crossterm::execute!(std::io::stderr(), crossterm::cursor::SavePosition);
 
         let total_chunks = chunks.len();
         let total_frames = chunks.iter().map(|c| c.end - c.start).sum();
@@ -565,17 +580,27 @@ fn draw_screen(
     processed: &Arc<AtomicUsize>,
     init_frames: usize,
 ) {
-    eprint!("\x1b[u");
+    let mut stderr = std::io::stderr();
+    let _ = crossterm::queue!(stderr, crossterm::cursor::RestorePosition);
 
     for line in lines.iter().take(worker_count) {
-        if line.is_empty() {
-            eprint!("\r\x1b[2K\n");
-        } else {
-            eprint!("\r\x1b[2K{line}\n");
+        let _ = crossterm::queue!(
+            stderr,
+            crossterm::cursor::MoveToColumn(0),
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine)
+        );
+        if !line.is_empty() {
+            let _ = crossterm::queue!(stderr, crossterm::style::Print(line));
         }
+        let _ = crossterm::queue!(stderr, crossterm::style::Print("\n"));
     }
 
-    eprint!("\r\x1b[2K\n");
+    let _ = crossterm::queue!(
+        stderr,
+        crossterm::cursor::MoveToColumn(0),
+        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+        crossterm::style::Print("\n")
+    );
 
     let data = state.completions.lock().unwrap();
     let completed_frames: usize = data.chnks_done.iter().map(|c| c.frames).sum();
@@ -614,10 +639,16 @@ fn draw_screen(
     let eta_h = (eta_secs / 3600).min(99);
     let eta_m = (eta_secs % 3600) / 60;
 
-    eprint!(
-        "\r\x1b[2K{W}{h:02}{P}:{W}{m:02} {C}[{G}{chunks_done}{C}/{R}{}{C}] [{bar}{C}] {W}{perc}% \
-         {G}{frames_done}{C}/{R}{} {C}({Y}{fps:.2}{C}, {W}{eta_h:02}{P}:{W}{eta_m:02}{C}, \
-         {bitrate_str}{C}, {est_str}{C}{N})\n",
-        state.total_chunks, state.total_frames
+    let _ = crossterm::queue!(
+        stderr,
+        crossterm::cursor::MoveToColumn(0),
+        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+        crossterm::style::Print(format!(
+            "{W}{h:02}{P}:{W}{m:02} {C}[{G}{chunks_done}{C}/{R}{}{C}] [{bar}{C}] {W}{perc}% \
+             {G}{frames_done}{C}/{R}{} {C}({Y}{fps:.2} fps{C}, eta \
+             {W}{eta_h:02}{P}:{W}{eta_m:02}{C}, {bitrate_str}{C}, {est_str}{C}{N})\n",
+            state.total_chunks, state.total_frames
+        ))
     );
+    let _ = stderr.flush();
 }

@@ -68,8 +68,12 @@ pub struct Args {
 }
 
 extern "C" fn restore() {
-    eprint!("\x1b[?25h\x1b[?1049l");
-    let _ = std::io::stderr().flush();
+    let _ = crossterm::execute!(
+        std::io::stderr(),
+        crossterm::cursor::Show,
+        crossterm::terminal::LeaveAlternateScreen
+    );
+    let _ = crossterm::terminal::disable_raw_mode();
 }
 extern "C" fn exit_restore(_: i32) {
     restore();
@@ -460,8 +464,13 @@ const fn scale_crop(
 }
 
 fn main_with_args(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
-    eprint!("\x1b[?1049h\x1b[H\x1b[?25l");
-    std::io::stderr().flush().unwrap();
+    let _ = crossterm::execute!(
+        std::io::stderr(),
+        crossterm::terminal::EnterAlternateScreen,
+        crossterm::cursor::MoveTo(0, 0),
+        crossterm::cursor::Hide
+    );
+    let _ = crossterm::terminal::enable_raw_mode();
 
     ensure_scene_file(args)?;
 
@@ -581,8 +590,12 @@ fn main_with_args(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
         fs::remove_file(&video_mkv)?;
     }
 
-    eprint!("\x1b[?25h\x1b[?1049l");
-    std::io::stderr().flush().unwrap();
+    let _ = crossterm::execute!(
+        std::io::stderr(),
+        crossterm::cursor::Show,
+        crossterm::terminal::LeaveAlternateScreen
+    );
+    let _ = crossterm::terminal::disable_raw_mode();
 
     let input_size = fs::metadata(&args.input)?.len();
     let output_size = fs::metadata(&args.output)?.len();
@@ -642,8 +655,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = args.output.clone();
 
     std::panic::set_hook(Box::new(move |panic_info| {
-        eprint!("\x1b[?25h\x1b[?1049l");
-        let _ = std::io::stderr().flush();
+        let _ = crossterm::execute!(
+            std::io::stderr(),
+            crossterm::cursor::Show,
+            crossterm::terminal::LeaveAlternateScreen
+        );
+        let _ = crossterm::terminal::disable_raw_mode();
         eprintln!("{panic_info}");
         eprintln!("{}, FAIL", output.display());
     }));
@@ -656,8 +673,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Err(e) = main_with_args(&args) {
-        eprint!("\x1b[?1049l");
-        std::io::stderr().flush().unwrap();
+        let _ = crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen);
+        let _ = crossterm::terminal::disable_raw_mode();
         eprintln!("{}, FAIL", args.output.display());
         return Err(e);
     }
