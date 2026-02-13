@@ -38,7 +38,10 @@ pub fn load_scenes(path: &Path, t_frames: usize) -> Result<Vec<Scene>, Box<dyn s
         .filter_map(|line| {
             let t = line.trim();
             let (f, r) = t.split_once(char::is_whitespace).unwrap_or((t, ""));
-            Some((f.parse::<usize>().ok()?, Some(r.trim()).filter(|s| !s.is_empty()).map(Box::from)))
+            Some((
+                f.parse::<usize>().ok()?,
+                Some(r.trim()).filter(|s| !s.is_empty()).map(Box::from),
+            ))
         })
         .collect();
 
@@ -47,7 +50,7 @@ pub fn load_scenes(path: &Path, t_frames: usize) -> Result<Vec<Scene>, Box<dyn s
     let mut scenes = Vec::new();
     for i in 0..parsed.len() {
         let (s, params) = &parsed[i];
-        let e = parsed.get(i + 1).map(|(f, _)| *f).unwrap_or(t_frames);
+        let e = parsed.get(i + 1).map_or(t_frames, |(f, _)| *f);
         scenes.push(Scene { s_frame: *s, e_frame: e, params: params.clone() });
     }
 
@@ -447,12 +450,17 @@ fn run_merge(
         }
 
         if ranges.is_none() {
-            cmd2.args(["-map", &format!("{input_idx}:s?")])
-                .args(["-map", &format!("{input_idx}:t?")])
+            cmd2.args(["-map", input_idx])
+                .args(["-map", &format!("-{input_idx}:V")])
+                .args(["-map", &format!("-{input_idx}:a")])
                 .args(["-map_chapters", input_idx]);
         }
 
-        cmd2.args(["-c", "copy"]).args(FF_FLAGS).arg(output);
+        cmd2.args(["-c", "copy"]);
+        if let Some((dw, dh)) = inf.dar {
+            cmd2.args(["-aspect", &format!("{dw}:{dh}")]);
+        }
+        cmd2.args(FF_FLAGS).arg(output);
 
         let status2 = cmd2.status()?;
         let _ = fs::remove_file(&video);
@@ -504,12 +512,17 @@ fn mux_av(
     }
 
     if ranges.is_none() {
-        cmd.args(["-map", &format!("{input_idx}:s?")])
-            .args(["-map", &format!("{input_idx}:t?")])
+        cmd.args(["-map", input_idx])
+            .args(["-map", &format!("-{input_idx}:V")])
+            .args(["-map", &format!("-{input_idx}:a")])
             .args(["-map_chapters", input_idx]);
     }
 
-    cmd.args(["-c", "copy"]).args(FF_FLAGS).arg(output);
+    cmd.args(["-c", "copy"]);
+    if let Some((dw, dh)) = inf.dar {
+        cmd.args(["-aspect", &format!("{dw}:{dh}")]);
+    }
+    cmd.args(FF_FLAGS).arg(output);
 
     let status = cmd.status()?;
     let _ = fs::remove_file(&temp_audio);
@@ -560,7 +573,7 @@ fn extract_segment(input: &Path, output: &Path, start: Option<f64>, duration: Op
     cmd.arg("-i")
         .arg(input)
         .args(["-vn", "-sn", "-dn", "-map", "0:a", "-c", "copy"])
-        .args(["-map_metadata", "-1", "-map_chapters", "-1"])
+        .args(["-map_chapters", "-1"])
         .args(FF_FLAGS)
         .arg(output);
 

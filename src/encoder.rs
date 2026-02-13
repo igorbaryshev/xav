@@ -433,9 +433,9 @@ fn colorize_h26x(cmd: &mut Command, inf: &VidInf, is_x264: bool) {
         }
     }
     if let Some(csp) = inf.chroma_sample_position
-        && (0..=5).contains(&csp)
+        && (1..=6).contains(&csp)
     {
-        cmd.args(["--chromaloc", &csp.to_string()]);
+        cmd.args(["--chromaloc", &(csp - 1).to_string()]);
     }
     if let Some(ref md) = inf.mastering_display
         && let Some(converted) = h26x_mastering(md, is_x264)
@@ -591,9 +591,9 @@ fn colorize_vvenc(cmd: &mut Command, inf: &VidInf) {
         cmd.args(["--Range", if cr == 1 { "full" } else { "limited" }]);
     }
     if let Some(csp) = inf.chroma_sample_position
-        && (0..=5).contains(&csp)
+        && (1..=6).contains(&csp)
     {
-        cmd.args(["--ChromaSampleLocType", &csp.to_string()]);
+        cmd.args(["--ChromaSampleLocType", &(csp - 1).to_string()]);
     }
     if let Some(ref md) = inf.mastering_display
         && let Some(converted) = h26x_mastering(md, false)
@@ -717,6 +717,87 @@ const fn matrix_coeff_str(v: i32) -> &'static str {
         13 => "chromcl",
         14 => "ictcp",
         _ => "unspecified",
+    }
+}
+
+#[cfg(feature = "libsvtav1")]
+fn parse_svt_param(config: *mut crate::svt::EbSvtAv1EncConfiguration, name: &str, value: &str) {
+    let n = std::ffi::CString::new(name).unwrap();
+    let v = std::ffi::CString::new(value).unwrap();
+    unsafe { crate::svt::svt_av1_enc_parse_parameter(config, n.as_ptr(), v.as_ptr()) };
+}
+
+#[cfg(feature = "libsvtav1")]
+fn parse_svt_params(config: *mut crate::svt::EbSvtAv1EncConfiguration, params: &str) {
+    let mut iter = params.split_whitespace();
+    while let Some(key) = iter.next() {
+        if let Some(name) = key.strip_prefix("--")
+            && let Some(val) = iter.next()
+        {
+            parse_svt_param(config, name, val);
+        }
+    }
+}
+
+#[cfg(feature = "libsvtav1")]
+pub fn set_svt_config(config: *mut crate::svt::EbSvtAv1EncConfiguration, cfg: &EncConfig) {
+    let w = cfg.width.to_string();
+    let h = cfg.height.to_string();
+
+    for (name, value) in [
+        ("input-depth", "10"),
+        ("color-format", "1"),
+        ("profile", "0"),
+        ("tile-rows", "0"),
+        ("tile-columns", "0"),
+        ("keyint", "0"),
+        ("rc", "0"),
+        ("scd", "0"),
+    ] {
+        parse_svt_param(config, name, value);
+    }
+
+    parse_svt_param(config, "width", &w);
+    parse_svt_param(config, "forced-max-frame-width", &w);
+    parse_svt_param(config, "height", &h);
+    parse_svt_param(config, "forced-max-frame-height", &h);
+    parse_svt_param(config, "fps-num", &cfg.inf.fps_num.to_string());
+    parse_svt_param(config, "fps-denom", &cfg.inf.fps_den.to_string());
+
+    if cfg.crf >= 0.0 {
+        parse_svt_param(config, "crf", &format!("{:.2}", cfg.crf));
+    }
+
+    if let Some(cp) = cfg.inf.color_primaries {
+        parse_svt_param(config, "color-primaries", &cp.to_string());
+    }
+    if let Some(tc) = cfg.inf.transfer_characteristics {
+        parse_svt_param(config, "transfer-characteristics", &tc.to_string());
+    }
+    if let Some(mc) = cfg.inf.matrix_coefficients {
+        parse_svt_param(config, "matrix-coefficients", &mc.to_string());
+    }
+    if let Some(cr) = cfg.inf.color_range {
+        parse_svt_param(config, "color-range", &cr.to_string());
+    }
+    if let Some(csp) = cfg.inf.chroma_sample_position {
+        parse_svt_param(config, "chroma-sample-position", &csp.to_string());
+    }
+    if let Some(ref md) = cfg.inf.mastering_display {
+        parse_svt_param(config, "mastering-display", md);
+    }
+    if let Some(ref cl) = cfg.inf.content_light {
+        parse_svt_param(config, "content-light", cl);
+    }
+
+    if let Some(gt) = cfg.grain_table {
+        parse_svt_param(config, "fgs-table", &gt.display().to_string());
+    }
+
+    parse_svt_params(config, cfg.params);
+
+    if let Some(z) = cfg.zone_params {
+        parse_svt_params(config, z);
     }
 }
 

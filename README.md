@@ -2,7 +2,7 @@
 
 1. [Description](#description)
 2. [Features](#features)
-3. [User Guide](#user-guide-and-faq)
+3. [User Guide and FAQ](#user-guide-and-faq)
 4. [Dependencies](#dependencies)
 5. [Building](#building)
 5. [Other Recommended Tools](#other-recommended-tools)
@@ -14,7 +14,7 @@
 - Uses and optimizes FFMS2 & vship internally without relying on VapourSynth and/or FFmpeg or any other external calls
 
 ## Features
-- Fastest and most efficient chunked video encoding
+- Fastest and most efficient chunked video encoding (now optionally with even faster svt-av1 library interface; everything under a single process)
 - Fastest and most efficient target quality encoding with state-of-the-art metrics such as [CVVDP](https://achapiro.github.io/Man24/man24.pdf) and Butteraugli 5p-norm & SSIMULACRA2 from JPEG XL (Google/Cloudinary)
 - Very fast, state-of-the-art scene change detection with pre-configured sane defaults. Optionally, other SCD methods such as TransNetv2 can be used externally
 - Automated color & HDR metadata and frame/container metadata parsing
@@ -25,8 +25,9 @@
 - Detailed video output summary, TQ output summary and TQ related JSON log file
 - Auto resume where you left off for additional safety if it crashes or intentionally stopped
 - Native trim and splice support
-- **Piping support:** You can pipe any command that produces frames: `command - | xav ...` **NOTE:** This is of course slower than the native, highly optimized pipeline but it can be preferable in some workflows
+- **Piping:** You can pipe any command that produces frames: `command - | xav ...` **NOTE:** This is of course slower than the native, highly optimized pipeline but it can be preferable in some workflows
 - Complex flags/parameters are abstracted for convenience. The user can still override them. `xav` builds the encoder command and lets the user only deal with parameters that actually matter such as the `preset`
+- **Zoning:** Very simply, you can add your special parameters next to keyframe positions in the scenes file to encode different scenes with different parameters
 
 ## User Guide and FAQ
 - Refer to `user_doc.pdf` (work in progress)
@@ -36,7 +37,7 @@
 - Rust Nightly, NASM, Clang
 
 **Runtime:**
-- One encoder binary: [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | [AVM](https://gitlab.com/AOMediaCodec/avm) | [VVENC](https://github.com/fraunhoferhhi/vvenc) | [X265](https://bitbucket.org/multicoreware/x265_git/wiki/Home) | [X264](https://www.videolan.org/developers/x264.html)
+- One encoder binary (or SVT-AV1 library): [SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) | [AVM](https://gitlab.com/AOMediaCodec/avm) | [VVENC](https://github.com/fraunhoferhhi/vvenc) | [X265](https://bitbucket.org/multicoreware/x265_git/wiki/Home) | [X264](https://www.videolan.org/developers/x264.html)
 - [FFMS2](https://github.com/FFMS/ffms2) (used to access decoders and provides frame accuracy)
 
 **Runtime (Optional):**
