@@ -113,12 +113,11 @@ pub fn encode_all(
         let idx = Arc::clone(idx);
         let inf = inf.clone();
         let sem = Arc::clone(&sem);
-        let seek_mode = args.seek_mode.unwrap_or(0) as i32;
         thread::spawn(move || {
             if let Some(mut reader) = pipe_reader {
                 decode_pipe(&chunks, &mut reader, &inf, &tx, &skip_indices, strat, &sem);
             } else {
-                decode_chunks(&chunks, &idx, &inf, &tx, &skip_indices, strat, &sem, seek_mode);
+                decode_chunks(&chunks, &idx, &inf, &tx, &skip_indices, strat, &sem);
             }
         })
     };
@@ -484,7 +483,6 @@ fn encode_tq(
         let enc_tx = enc_tx.clone();
         let permits_decoder = Arc::clone(&permits);
         let permits_done = Arc::clone(&permits);
-        let seek_mode = args.seek_mode.unwrap_or(0) as i32;
 
         thread::spawn(move || {
             let (decode_tx, decode_rx) = bounded::<crate::worker::WorkPkg>(2);
@@ -510,7 +508,6 @@ fn encode_tq(
                         &skip_indices,
                         strat,
                         &permits_decoder,
-                        seek_mode,
                     );
                 }
             });
